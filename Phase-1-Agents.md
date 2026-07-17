@@ -34,19 +34,19 @@ Initial files: `app.py`, `templates/index.html`, `static/script.js`, `static/sty
 ## 2. Configuration
 
 - All settings (API keys, model names, IDs, ports, system prompts) live in `core/config.py` — never hardcoded, never scattered.
+- **This project uses Pydantic v2.** Never use v1 syntax (`class Config:`, `@validator`); use `model_config = SettingsConfigDict(...)` and `@field_validator`.
 - Use `pydantic-settings` to load `.env` into a typed `Settings` object:
 
 ```python
 # core/config.py
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     port: int = 8080
-    frontend_url: str = "http://localhost:5173"
+    frontend_url: str = "http://localhost:5173"  # use list[str] if multiple origins are ever needed
     api_key: str = ""
 
-    class Config:
-        env_file = ".env"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
 ```
@@ -120,6 +120,7 @@ project/
 - `api/` handles HTTP only — validation, status codes, cookies. No business logic.
 - `services/` contain business logic — no `Request`/`Response` objects.
 - `db/` handles persistence only. Design so the in-memory store can be swapped for SQLAlchemy without touching services.
+- **In-memory state caveat:** while using dict-based storage, run Uvicorn with a single worker (`workers=1`, the default). Multiple workers fork separate processes with divergent copies of the dict, and `--reload` wipes state — both produce erratic behavior. Only scale workers after moving to a real database.
 - Dependencies flow one direction: `api → services → db`. Never the reverse.
 
 ---
@@ -145,6 +146,30 @@ async def handler():
 
 - Blocking sync library with no async alternative → declare the route `def` (not `async def`) so FastAPI runs it in its threadpool.
 - Never call `time.sleep()`, `requests.get()`, or blocking DB drivers inside `async def`.
+
+**Background tasks fail silently — always handle their exceptions.**
+
+An unhandled exception inside `asyncio.create_task()` is swallowed until garbage collection: the app keeps running, the task is dead, nothing is logged. Every background task must either wrap its body in `try/except` with logging, or attach a done-callback:
+
+```python
+async def _process(item_id: int) -> None:
+    try:
+        await do_work(item_id)
+    except Exception:
+        logger.exception("Background task failed for item %s", item_id)
+
+task = asyncio.create_task(_process(item_id))
+
+# Alternative: catch anything that slips through
+def _log_task_error(task: asyncio.Task) -> None:
+    if not task.cancelled() and task.exception():
+        logger.error("Unhandled task exception", exc_info=task.exception())
+
+task.add_done_callback(_log_task_error)
+```
+
+- Keep a reference to created tasks (e.g., in a set) — fire-and-forget tasks can be garbage-collected mid-execution.
+- For simple post-response work, prefer FastAPI's `BackgroundTasks` dependency over raw `create_task`.
 
 ---
 
@@ -215,11 +240,56 @@ def get_departure(departure_id: int) -> Optional[Departure]: ...
 
 ---
 
-## 11. Best-Practice Checklist
+## 11. Dependency Management
 
-- [ ] Use `lifespan` context manager (not deprecated `@app.on_event`) for startup/shutdown resources.
+Phase 1 baseline `requirements.txt` (pin versions):
+
+```
+fastapi
+uvicorn[standard]
+jinja2
+pydantic-settings
+python-multipart
+```
+
+Rules for agents:
+
+- **Before appending to `requirements.txt`, check the package isn't already listed.** Never create duplicate or conflicting entries; edit the existing line to change a version.
+- **Form data / file uploads require `python-multipart`.** Any route using `Form(...)`, `File(...)`, or `UploadFile` will fail (500/422) without it — verify it's in `requirements.txt` before writing such routes.
+- Auth features (JWT, TOTP, password hashing) typically require `cryptography`, `pyjwt` or `passlib` — add them explicitly when implementing auth, don't assume they're transitively installed.
+- After editing `requirements.txt`, run `pip install -r requirements.txt` and confirm the app starts.
+
+---
+
+## 12. Best-Practice Checklist
+
+- [ ] Use the `lifespan` context manager (not deprecated `@app.on_event`) for startup/shutdown resources:
+
+```python
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # startup: open pools, load resources
+    yield
+    # shutdown: close pools, flush state
+
+app = FastAPI(lifespan=lifespan)
+```
+
 - [ ] Use `Depends()` for shared logic (auth, DB sessions) instead of duplicating in handlers.
 - [ ] Raise `HTTPException` with correct status codes (`404`, `409`, `422`) — never return error dicts with `200`.
 - [ ] Pin dependency versions in `requirements.txt`.
 - [ ] Add `pytest` + `httpx.AsyncClient` tests for each new endpoint.
 - [ ] Auto-generated docs at `/docs` must remain accurate — schemas and `response_model` keep them so.
+
+---
+
+## 13. AI Agent Pitfalls — Quick Reference
+
+- Never use Pydantic v1 syntax: no `class Config:`, no `@validator`. Use `model_config = SettingsConfigDict(...)` and `@field_validator`.
+- Never accept form data or file uploads without confirming `python-multipart` is in `requirements.txt`.
+- Never launch `asyncio.create_task()` without exception handling (`try/except` + logging, or `add_done_callback`) — failures are otherwise silent.
+- Never fall back to `@app.on_event("startup")` — use the `lifespan` skeleton above.
+- Never scale Uvicorn workers or rely on `--reload` persistence while state lives in an in-memory dict.
+- Never append duplicate lines to `requirements.txt`.
