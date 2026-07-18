@@ -6,7 +6,7 @@ Instructions for AI coding agents working in this repository. Follow these conve
 
 ## 1. Bootstrap Philosophy
 
-- Start minimal, evolve incrementally. 
+- Start minimal, evolve incrementally.
 
 ```python
 # app.py
@@ -23,6 +23,9 @@ templates = Jinja2Templates(directory="templates")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 ```
+
+Initial files: `app.py`, `templates/index.html`, `static/script.js`, `static/styles.css`, `requirements.txt`.
+
 ---
 
 ## 2. Configuration
@@ -72,7 +75,6 @@ logger = logging.getLogger(__name__)
 ## 4. Running the Server
 
 ```python
-# app.py (Phase 1) or app/main.py (Phase 2)
 import uvicorn
 from core.config import settings
 
@@ -85,7 +87,7 @@ if __name__ == "__main__":
 
 ---
 
-## 5. Target Project Structure
+## 5. Target Project Structure (Phase 2)
 
 Refactor into this layout once the app has auth, multiple resources, or >~300 lines:
 
@@ -95,23 +97,19 @@ project/
 ├── .env.example            # Template with placeholder values
 ├── requirements.txt
 ├── README.md
-├── templates/
-│   └── index.html
-├── static/
-│   ├── styles.css
-│   └── script.js
-├── main.py             # App factory: wires middleware + routers only
-├── core/
-│   ├── config.py       # pydantic-settings → typed Settings object
-│   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
-├── models/
-│   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
-├── db/
-│   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
-├── services/
-│   └── <resource>_service.py  # Business logic — no HTTP concerns
-└── api/
-    └── <resource>.py   # APIRouter — thin handlers that delegate to services
+└── app/
+    ├── main.py             # App factory: wires middleware + routers only
+    ├── core/
+    │   ├── config.py       # pydantic-settings → typed Settings object
+    │   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
+    ├── models/
+    │   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
+    ├── db/
+    │   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
+    ├── services/
+    │   └── <resource>_service.py  # Business logic — no HTTP concerns
+    └── api/
+        └── <resource>.py   # APIRouter — thin handlers that delegate to services
 ```
 
 **Layering rules (strict):**
@@ -181,9 +179,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 class DepartureCreate(BaseModel):
-    thumbnail: str 
+    thumbnail: str
     description: str
-    platform: str 
+    platform: str
     departure: str
 
 class DepartureUpdate(BaseModel):
@@ -227,7 +225,26 @@ def get_departure(departure_id: int) -> Optional[Departure]: ...
 
 ---
 
-## 10. Agent Workflow Rules
+## 10. Frontend Rules
+
+**The frontend is not a priority in this phase. It exists only to exercise and test the backend.**
+
+- Keep it as minimal as possible: pure HTML, pure CSS, vanilla JavaScript. No frameworks (React/Vue/Svelte), no bundlers, no build step, no npm.
+- Use **Bootstrap 5 via CDN** for styling — elegant and minimal, default components, no custom theme work:
+
+```html
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+```
+
+- Files: `templates/index.html`, `static/script.js`, `static/styles.css` — nothing more unless a feature strictly requires it.
+- `script.js` uses plain `fetch()` against the API endpoints; no client-side routing, no state libraries.
+- Simple but working: every backend endpoint should be triggerable from the page (forms, buttons, a results table). Function over polish.
+- Do not spend effort on responsiveness, animations, accessibility beyond Bootstrap defaults, or visual refinement — backend correctness comes first. The frontend will be rebuilt properly later.
+
+---
+
+## 11. Agent Workflow Rules
 
 - Read the relevant feature spec in `docs/features/*.md` before coding.
 - Propose an implementation plan and wait for approval before modifying files.
@@ -238,7 +255,7 @@ def get_departure(departure_id: int) -> Optional[Departure]: ...
 
 ---
 
-## 11. Dependency Management
+## 12. Dependency Management
 
 Rules for agents:
 
@@ -249,7 +266,7 @@ Rules for agents:
 
 ---
 
-## 12. Best-Practice Checklist
+## 13. Best-Practice Checklist
 
 - [ ] Use the `lifespan` context manager (not deprecated `@app.on_event`) for startup/shutdown resources:
 
@@ -273,7 +290,7 @@ app = FastAPI(lifespan=lifespan)
 
 ---
 
-## 13. AI Agent Pitfalls — Quick Reference
+## 14. AI Agent Pitfalls — Quick Reference
 
 - Never use Pydantic v1 syntax: no `class Config:`, no `@validator`. Use `model_config = SettingsConfigDict(...)` and `@field_validator`.
 - Never accept form data or file uploads without confirming `python-multipart` is in `requirements.txt`.
