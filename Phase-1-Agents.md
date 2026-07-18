@@ -6,10 +6,7 @@ Instructions for AI coding agents working in this repository. Follow these conve
 
 ## 1. Bootstrap Philosophy
 
-- Start minimal, evolve incrementally. Phase 1 is a single `app.py`; refactor into the `app/` package only when features demand it.
-- Never introduce abstractions (services, repositories, factories) before at least two call sites need them.
-
-### Phase 1 — Minimal skeleton
+- Start minimal, evolve incrementally. 
 
 ```python
 # app.py
@@ -26,9 +23,6 @@ templates = Jinja2Templates(directory="templates")
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 ```
-
-Initial files: `app.py`, `templates/index.html`, `static/script.js`, `static/styles.css`, `requirements.txt`.
-
 ---
 
 ## 2. Configuration
@@ -91,7 +85,7 @@ if __name__ == "__main__":
 
 ---
 
-## 5. Target Project Structure (Phase 2)
+## 5. Target Project Structure
 
 Refactor into this layout once the app has auth, multiple resources, or >~300 lines:
 
@@ -101,19 +95,23 @@ project/
 ├── .env.example            # Template with placeholder values
 ├── requirements.txt
 ├── README.md
-└── app/
-    ├── main.py             # App factory: wires middleware + routers only
-    ├── core/
-    │   ├── config.py       # pydantic-settings → typed Settings object
-    │   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
-    ├── models/
-    │   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
-    ├── db/
-    │   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
-    ├── services/
-    │   └── <resource>_service.py  # Business logic — no HTTP concerns
-    └── api/
-        └── <resource>.py   # APIRouter — thin handlers that delegate to services
+├── templates/
+│   └── index.html
+├── static/
+│   ├── styles.css
+│   └── script.js
+├── main.py             # App factory: wires middleware + routers only
+├── core/
+│   ├── config.py       # pydantic-settings → typed Settings object
+│   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
+├── models/
+│   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
+├── db/
+│   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
+├── services/
+│   └── <resource>_service.py  # Business logic — no HTTP concerns
+└── api/
+    └── <resource>.py   # APIRouter — thin handlers that delegate to services
 ```
 
 **Layering rules (strict):**
@@ -183,9 +181,9 @@ from pydantic import BaseModel
 from typing import Optional
 
 class DepartureCreate(BaseModel):
-    thumbnail: str = "🚆"
+    thumbnail: str 
     description: str
-    platform: str = ""
+    platform: str 
     departure: str
 
 class DepartureUpdate(BaseModel):
@@ -241,16 +239,6 @@ def get_departure(departure_id: int) -> Optional[Departure]: ...
 ---
 
 ## 11. Dependency Management
-
-Phase 1 baseline `requirements.txt` (pin versions):
-
-```
-fastapi
-uvicorn[standard]
-jinja2
-pydantic-settings
-python-multipart
-```
 
 Rules for agents:
 
