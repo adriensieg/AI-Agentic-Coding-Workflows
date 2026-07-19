@@ -1,7 +1,5 @@
 # AGENTS.md — FastAPI Web Application
 
-Instructions for AI coding agents working in this repository. Follow these conventions for all generated code.
-
 ---
 
 ## 1. Bootstrap Philosophy
@@ -27,8 +25,7 @@ async def index(request: Request):
 
 ---
 
-## 2. Target Project Structure
-
+## 2. Our target Project Structure
 
 ```
 project/
@@ -91,6 +88,13 @@ settings = Settings()
 - `.env` is git-ignored. Maintain `.env.example` with placeholder values.
 - Agents must never write secrets into source files or commit them.
 
+
+Build paths relative to our project instead of relying on the current working directory, which can change depending on how the application is started.
+```
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+This sets BASE_DIR to the directory containing the current Python file.
+```
 ---
 
 ## 4. Logging & Observability
