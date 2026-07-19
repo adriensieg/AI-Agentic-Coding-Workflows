@@ -34,7 +34,6 @@ async def index(request: Request):
 project/
 ├── .env                    # Runtime config (git-ignored)
 ├── requirements.txt
-├── README.md
 ├── main.py             # App factory: wires middleware + routers only
 ├── core/
 │   ├── config.py       # pydantic-settings → typed Settings object
@@ -45,8 +44,19 @@ project/
 │   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
 ├── services/
 │   └── <resource>_service.py  # Business logic — no HTTP concerns
-└── api/
-    └── <resource>.py   # APIRouter — thin handlers that delegate to services
+├──api/
+│   └── <resource>.py   # APIRouter — thin handlers that delegate to services
+├── README.md
+│
+├── AGENTS.md                   # Layer 1: how I write code           ← AI knowledge
+├── docs/
+│   ├── architecture.md         # Layer 1: how the system is designed ← AI knowledge
+│   └── features/
+│       ├── task-priorities.md  # Layer 2: feature spec (one per feature)
+│       └── task-search.md      # Layer 2: feature spec
+│
+├── opencode.json               # OpenCode config: model, permissions, instructions
+└── .gitignore                  # excludes junk from Git AND from agent context
 ```
 
 **Layering rules (strict):**
