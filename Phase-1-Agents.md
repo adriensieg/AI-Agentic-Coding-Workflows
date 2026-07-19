@@ -7,6 +7,7 @@ Instructions for AI coding agents working in this repository. Follow these conve
 ## 1. Bootstrap Philosophy
 
 - Start minimal, evolve incrementally.
+- We will start with a backend in FastAPI - and a simple UI in pure javascript, html and css. 
 
 ```python
 # app.py
@@ -24,11 +25,40 @@ async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 ```
 
-Initial files: `app.py`, `templates/index.html`, `static/script.js`, `static/styles.css`, `requirements.txt`.
+---
+
+## 2. Target Project Structure
+
+
+```
+project/
+├── .env                    # Runtime config (git-ignored)
+├── requirements.txt
+├── README.md
+├── main.py             # App factory: wires middleware + routers only
+├── core/
+│   ├── config.py       # pydantic-settings → typed Settings object
+│   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
+├── models/
+│   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
+├── db/
+│   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
+├── services/
+│   └── <resource>_service.py  # Business logic — no HTTP concerns
+└── api/
+    └── <resource>.py   # APIRouter — thin handlers that delegate to services
+```
+
+**Layering rules (strict):**
+- `api/` handles HTTP only — validation, status codes, cookies. No business logic.
+- `services/` contain business logic — no `Request`/`Response` objects.
+- `db/` handles persistence only. Design so the in-memory store can be swapped for SQLAlchemy without touching services.
+- **In-memory state caveat:** while using dict-based storage, run Uvicorn with a single worker (`workers=1`, the default). Multiple workers fork separate processes with divergent copies of the dict, and `--reload` wipes state — both produce erratic behavior. Only scale workers after moving to a real database.
+- Dependencies flow one direction: `api → services → db`. Never the reverse.
 
 ---
 
-## 2. Configuration
+## 3. Configuration
 
 - All settings (API keys, model names, IDs, ports, system prompts) live in `core/config.py` — never hardcoded, never scattered.
 - **This project uses Pydantic v2.** Never use v1 syntax (`class Config:`, `@validator`); use `model_config = SettingsConfigDict(...)` and `@field_validator`.
@@ -53,7 +83,7 @@ settings = Settings()
 
 ---
 
-## 3. Logging & Observability
+## 4. Logging & Observability
 
 - Configure logging once at startup; use `logger`, not `print`, in application code:
 
@@ -72,7 +102,7 @@ logger = logging.getLogger(__name__)
 
 ---
 
-## 4. Running the Server
+## 5. Running the Server
 
 ```python
 import uvicorn
@@ -84,40 +114,6 @@ if __name__ == "__main__":
 
 - Port is read from config (`PORT` env var, default `8080`).
 - Dev command: `uvicorn app.main:app --reload --port 8080`.
-
----
-
-## 5. Target Project Structure (Phase 2)
-
-Refactor into this layout once the app has auth, multiple resources, or >~300 lines:
-
-```
-project/
-├── .env                    # Runtime config (git-ignored)
-├── .env.example            # Template with placeholder values
-├── requirements.txt
-├── README.md
-└── app/
-    ├── main.py             # App factory: wires middleware + routers only
-    ├── core/
-    │   ├── config.py       # pydantic-settings → typed Settings object
-    │   └── security.py     # Auth primitives: tokens, sessions, TOTP/QR
-    ├── models/
-    │   └── <resource>.py   # Pydantic schemas: Read / Create / Update per resource
-    ├── db/
-    │   └── database.py     # Storage layer (in-memory dict first; swappable for SQLAlchemy)
-    ├── services/
-    │   └── <resource>_service.py  # Business logic — no HTTP concerns
-    └── api/
-        └── <resource>.py   # APIRouter — thin handlers that delegate to services
-```
-
-**Layering rules (strict):**
-- `api/` handles HTTP only — validation, status codes, cookies. No business logic.
-- `services/` contain business logic — no `Request`/`Response` objects.
-- `db/` handles persistence only. Design so the in-memory store can be swapped for SQLAlchemy without touching services.
-- **In-memory state caveat:** while using dict-based storage, run Uvicorn with a single worker (`workers=1`, the default). Multiple workers fork separate processes with divergent copies of the dict, and `--reload` wipes state — both produce erratic behavior. Only scale workers after moving to a real database.
-- Dependencies flow one direction: `api → services → db`. Never the reverse.
 
 ---
 
